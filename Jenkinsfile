@@ -42,46 +42,37 @@ pipeline {
 
         stage('Register ECS Task Definition and Update Service') {
             steps {
-                script {
-                    def registerOutput = sh(
-                        script: """
-                            aws ecs register-task-definition \
-                                --family jk-webapp-td \
-                                --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
-                                --network-mode bridge \
-                                --requires-compatibilities EC2 \
-                                --cpu "1024" \
-                                --memory "512" \
-                                --container-definitions '[
-                                  {
-                                    "name": "jk-webapp-ctr",
-                                    "image": "${ECR_REPO}:${BUILD_NUMBER}",
-                                    "essential": true,
-                                    "memory": 512,
-                                    "portMappings": [
-                                      {
-                                        "containerPort": 3000,
-                                        "hostPort": 3000
-                                      }
-                                    ]
-                                  }
-                                ]'
-                        """,
-                        returnStdout: true
-                    ).trim()
-
-                    // Extract task definition ARN
-                    def taskDefArn = readJSON(text: registerOutput).taskDefinition.taskDefinitionArn
-
-                    // Use that ARN in the ECS service update
-                    sh '''
-                        aws ecs update-service \
-                            --cluster $ECS_CLUSTER \
-                            --service $ECS_SERVICE \
-                            --task-definition $taskDefArn \
-                            --force-new-deployment
-                    '''
-                }
+                sh """
+                    aws ecs register-task-definition \
+                        --family jk-webapp-td \
+                        --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
+                        --network-mode bridge \
+                        --requires-compatibilities EC2 \
+                        --cpu "1024" \
+                        --memory "512" \
+                        --container-definitions '[
+                          {
+                            "name": "jk-webapp-ctr",
+                            "image": "${ECR_REPO}:${BUILD_NUMBER}",
+                            "essential": true,
+                            "memory": 512,
+                            "portMappings": [
+                              {
+                                "containerPort": 3000,
+                                "hostPort": 3000
+                              }
+                            ]
+                          }
+                        ]'
+                """
+        
+                sh """
+                    aws ecs update-service \
+                        --cluster $ECS_CLUSTER \
+                        --service $ECS_SERVICE \
+                        --task-definition jk-webapp-td \
+                        --force-new-deployment
+                """
             }
         }
     }
