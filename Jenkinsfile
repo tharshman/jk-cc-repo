@@ -42,7 +42,7 @@ pipeline {
 
         stage('Register ECS Task Definition') {
             steps {
-                sh '''
+                sh """
                     aws ecs register-task-definition \
                         --family jk-webapp-td \
                         --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
@@ -53,18 +53,16 @@ pipeline {
                         --container-definitions '[
                           {
                             "name": "jk-webapp-ctr",
-                            "image": "'$ECR_REPO':'${BUILD_NUMBER}",
+                            "image": "${ECR_REPO}:${BUILD_NUMBER}",
                             "essential": true,
                             "memory": 512,
                             "portMappings": [
                               {
                                 "containerPort": 3000,
                                 "hostPort": 3000
-                              }
-                            ]
-                          }
-                        ]'
-                '''
+                              }]
+                          }]'
+                """
             }
         }
 
