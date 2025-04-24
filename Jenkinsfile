@@ -19,7 +19,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    docker build -t $ECR_REPO:$BUILD_NUMBER .
+                    docker build --no-cache -t $ECR_REPO:$BUILD_NUMBER .
                 '''
             }
         }
@@ -40,41 +40,47 @@ pipeline {
             }
         }
 
-        stage('Register ECS Task Definition') {
+        stage('Register ECS Task Definition and Update Service') {
             steps {
-                sh """
-                    aws ecs register-task-definition \
-                        --family jk-webapp-td \
-                        --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
-                        --network-mode bridge \
-                        --requires-compatibilities EC2 \
-                        --cpu "1024" \
-                        --memory "512" \
-                        --container-definitions '[
-                          {
-                            "name": "jk-webapp-ctr",
-                            "image": "${ECR_REPO}:${BUILD_NUMBER}",
-                            "essential": true,
-                            "memory": 512,
-                            "portMappings": [
-                              {
-                                "containerPort": 3000,
-                                "hostPort": 3000
-                              }]
-                          }]'
-                """
-            }
-        }
+                script {
+                    def registerOutput = sh(
+                        script: """
+                            aws ecs register-task-definition \
+                                --family jk-webapp-td \
+                                --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
+                                --network-mode bridge \
+                                --requires-compatibilities EC2 \
+                                --cpu "1024" \
+                                --memory "512" \
+                                --container-definitions '[
+                                  {
+                                    "name": "jk-webapp-ctr",
+                                    "image": "${ECR_REPO}:${BUILD_NUMBER}",
+                                    "essential": true,
+                                    "memory": 512,
+                                    "portMappings": [
+                                      {
+                                        "containerPort": 3000,
+                                        "hostPort": 3000
+                                      }
+                                    ]
+                                  }
+                                ]'
+                        """,
+                        returnStdout: true
+                    ).trim()
 
-        stage('Force ECS Service Update') {
-            steps {
-                sh '''
-                    aws ecs update-service \
-                        --cluster $ECS_CLUSTER \
-                        --service $ECS_SERVICE \
-                        --force-new-deployment
-                '''
+                    // Extract task definition ARN
+                    def taskDefArn = readJSON(text: registerOutput).taskDefinition.taskDefinitionArn
+
+                    // Use that ARN in the ECS service update
+                    sh """
+                        aws ecs update-service \
+                            --cluster $ECS_CLUSTER \
+                            --service $ECS_SERVICE \
+                            --task-definition $taskDefArn \
+                            --force-new-deployment
+                    """
+                }
             }
         }
-    }
-}
