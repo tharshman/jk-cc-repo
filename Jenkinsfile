@@ -74,13 +74,13 @@ pipeline {
                     def taskDefArn = readJSON(text: registerOutput).taskDefinition.taskDefinitionArn
 
                     // Use that ARN in the ECS service update
-                    sh """
+                    sh '''
                         aws ecs update-service \
                             --cluster $ECS_CLUSTER \
                             --service $ECS_SERVICE \
                             --task-definition $taskDefArn \
                             --force-new-deployment
-                    """
+                    '''
                 }
             }
         }
