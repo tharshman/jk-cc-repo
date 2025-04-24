@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+    
+    environment {
+        AWS_DEFAULT_REGION = "us-east-1"
+        AWS_CREDENTIALS = credentials('jk-aws-credentials')
+        ECR_REPO = "976193221400.dkr.ecr.us-east-1.amazonaws.com/jk-webapp"
+        ECS_CLUSTER = "jk-webapp-cluster"
+        ECS_SERVICE = "jk-webapp-td-service-flvo6c8w"
+    }
+
+    stages {
+        stage('Checkout Source from GitHub') {
+            steps {
+                git branch: 'main', credentialsId: 'jk-gh-tk', url: 'https://github.com/tharshman/jk-cc-repo.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build -t $ECR_REPO:$BUILD_NUMBER .
+                '''
+            }
+        }
+
+        stage('Login to AWS ECR') {
+            steps {
+                sh '''
+                    aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                '''
+            }
+        }
+
+        stage('Push Docker Image to ECR') {
+            steps {
+                sh '''
+                    docker push $ECR_REPO:$BUILD_NUMBER
+                '''
+            }
+        }
+
+        stage('Register ECS Task Definition') {
+            steps {
+                sh '''
+                    aws ecs register-task-definition \
+                        --family jk-webapp-td \
+                        --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
+                        --network-mode bridge \
+                        --container-definitions '[
+                          {
+                            "name": "jk-webapp-ctr",
+                            "image": "'$ECR_REPO':'$BUILD_NUMBER'",
+                            "essential": true,
+                            "memory": 256,
+                            "portMappings": [
+                              {
+                                "containerPort": 3000,
+                                "hostPort": 3000
+                              }
+                            ]
+                          }
+                        ]'
+                '''
+            }
+        }
+
+        stage('Force ECS Service Update') {
+            steps {
+                sh '''
+                    aws ecs update-service \
+                        --cluster $ECS_CLUSTER \
+                        --service $ECS_SERVICE \
+                        --force-new-deployment
+                '''
+            }
+        }
+    }
+}
