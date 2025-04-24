@@ -47,12 +47,15 @@ pipeline {
                         --family jk-webapp-td \
                         --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
                         --network-mode bridge \
+                        --requires-compatibilities EC2 \
+                        --cpu "1024" \
+                        --memory "512" \
                         --container-definitions '[
                           {
                             "name": "jk-webapp-ctr",
-                            "image": "'$ECR_REPO':'$BUILD_NUMBER'",
+                            "image": "'$ECR_REPO':'${BUILD_NUMBER}",
                             "essential": true,
-                            "memory": 256,
+                            "memory": 512,
                             "portMappings": [
                               {
                                 "containerPort": 3000,
