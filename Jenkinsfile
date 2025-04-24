@@ -46,7 +46,7 @@ pipeline {
                     aws ecs register-task-definition \
                         --family jk-webapp-td \
                         --execution-role-arn arn:aws:iam::976193221400:role/ecsTaskExecutionRole \
-                        --network-mode bridge \
+                        --network-mode awsvpc \
                         --requires-compatibilities EC2 \
                         --cpu "1024" \
                         --memory "512" \
@@ -59,7 +59,7 @@ pipeline {
                             "portMappings": [
                               {
                                 "containerPort": 3000,
-                                "hostPort": 3000
+                                "protocol": "tcp"
                               }
                             ]
                           }
